@@ -74,7 +74,7 @@ private static final Set<String> TARGET_PACKAGES = new HashSet<>(Arrays.asList(
 
 코드는 활성 창의 패키지명만 읽는다. 인터넷 권한은 요청하지 않는다.
 
-## 알려진 한계
+## 한계
 
 - **입력 지연**: 터치가 버튼을 뗄 때 실행된다. 길게 누르기와 드래그가 실시간이 아니다.
 - **드래그 경로**: 시작점과 끝점을 잇는 직선으로만 재현한다.
