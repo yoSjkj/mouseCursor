@@ -34,6 +34,10 @@
    - 스위치가 비활성이면: 설정 > 애플리케이션 > mouseCursor > ⋮ > **제한된 설정 허용**.
 3. 대상 게임을 실행하면 커서가 표시된다.
 
+| 1. 빌드 (▶ 버튼) | 2. 접근성 > 설치된 앱 | 3. 마우스 커서 켜기 |
+|---|---|---|
+| <img src="docs/step1-build.jpg" width="240"> | <img src="docs/step2-accessibility.jpg" width="240"> | <img src="docs/step3-enable.jpg" width="240"> |
+
 `res/xml/cursor_service.xml`을 수정한 뒤에는 접근성에서 서비스를 껐다 켜야 반영된다.
 
 서비스를 강제로 끄려면 볼륨 위·아래 버튼을 함께 길게 누른다(접근성 설정에서 바로가기를 켠 경우).
@@ -78,8 +82,3 @@ private static final Set<String> TARGET_PACKAGES = new HashSet<>(Arrays.asList(
 - **휠, 우클릭**: 대상 게임 안에서는 처리하지 않는다.
 - **하드코딩**: 대상 앱과 무시할 앱 목록이 코드에 있다.
 - `setObservedMotionEventSources()`(가로채지 않고 관찰만 하는 방식)는 확인한 기기에 메서드가 없어 쓰지 못했다.
-
-## 할 일
-
-- [ ] `StrokeDescription`의 `willContinue` / `continueStroke()`로 실시간 터치 전달
-- [ ] 게임 안에서 휠을 스와이프로 변환
