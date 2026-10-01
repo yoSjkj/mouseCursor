@@ -20,3 +20,9 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    // Android Code Studio가 빌드에 끼워 넣는 로그 수집기(LogWire)가 Kotlin으로 되어 있어서,
+    // 이게 없으면 앱이 시작하자마자 죽는다. 앱 코드 자체는 쓰지 않는다.
+    implementation libs.kotlin.stdlib
+}
