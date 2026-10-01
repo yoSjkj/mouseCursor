@@ -233,6 +233,12 @@ public class CursorService extends AccessibilityService {
 
     // 누른 위치부터 뗀 위치까지, 누른 시간만큼 터치를 재현
     private void performTouch(float x1, float y1, float x2, float y2, long duration) {
+        // 음수 좌표는 제스처 생성에서 예외가 나므로 화면 안으로 보정
+        x1 = Math.max(0f, x1);
+        y1 = Math.max(0f, y1);
+        x2 = Math.max(0f, x2);
+        y2 = Math.max(0f, y2);
+
         Path path = new Path();
         path.moveTo(x1, y1);
         boolean isDrag = Math.hypot(x2 - x1, y2 - y1) > DRAG_THRESHOLD;
@@ -240,12 +246,17 @@ public class CursorService extends AccessibilityService {
             path.lineTo(x2, y2);
         }
 
-        GestureDescription gesture = new GestureDescription.Builder()
-                .addStroke(new GestureDescription.StrokeDescription(path, 0, duration))
-                .build();
-        dispatchGesture(gesture, null, null);
-
-        lastAction = (isDrag ? "드래그 " : "탭 ") + duration + "ms";
+        String kind = isDrag ? "드래그 " : "탭 ";
+        try {
+            GestureDescription gesture = new GestureDescription.Builder()
+                    .addStroke(new GestureDescription.StrokeDescription(path, 0, duration))
+                    .build();
+            boolean sent = dispatchGesture(gesture, null, null);
+            lastAction = kind + duration + "ms" + (sent ? "" : " (전송 실패)");
+        } catch (RuntimeException e) {
+            // 터치 하나를 놓치더라도 서비스가 죽지 않게 함
+            lastAction = kind + "실패: " + e.getMessage();
+        }
     }
 
     private void updateStatus() {

@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">mouseCursor</string>
+    <string name="service_description">마우스 커서를 숨기는 게임에서 커서를 대신 표시하고, 마우스 클릭을 터치로 바꿔 줍니다. 지금 앞에 떠 있는 앱이 무엇인지만 확인하며, 화면 내용은 읽지 않습니다.</string>
 </resources>

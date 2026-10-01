@@ -37,7 +37,7 @@
 | IDE / 빌드 | Android Code Studio (AndroidIDE 포크) v1.0.0+gh.r4 |
 | SDK / JDK | Android SDK 35.0.1, JDK 17 |
 | 빌드 도구 | Gradle 9.0.0, AGP 8.13.0 |
-| 앱 설정 | compileSdk 36, minSdk 35, targetSdk 34 |
+| 앱 설정 | compileSdk 36, minSdk 35, targetSdk 36 |
 | 언어 | Java |
 | 터미널 | Termux + proot-distro Ubuntu |
 | 코드 보조 | Claude (채팅), Claude Code (Ubuntu 안에서 실행) |
@@ -171,8 +171,8 @@ private static final Set<String> TARGET_PACKAGES = new HashSet<>(Arrays.asList(
 ## 할 일
 
 - [ ] `StrokeDescription`의 `willContinue` / `continueStroke()`로 실시간 터치 전달 (지연, 경로 손실, 끊김을 한 번에 해결)
-- [ ] `performTouch` 좌표 검증과 예외 처리
+- [x] `performTouch` 좌표 검증과 예외 처리
 - [ ] 게임 안에서 휠을 스와이프로 변환
-- [ ] targetSdk를 35 이상으로 정리
-- [ ] 쓰지 않는 의존성(appcompat, constraintlayout, viewBinding) 정리
-- [ ] 접근성 설정에 보이는 서비스 설명 문구 작성
+- [x] targetSdk를 35 이상으로 정리
+- [x] 쓰지 않는 의존성(appcompat, constraintlayout, viewBinding) 정리
+- [x] 접근성 설정에 보이는 서비스 설명 문구 작성
