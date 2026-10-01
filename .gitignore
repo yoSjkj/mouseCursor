@@ -1,0 +1,17 @@
+# Gradle
+.gradle/
+build/
+
+# IDE
+.acside/
+.idea/
+*.iml
+
+# 로컬 설정 / 서명 키
+local.properties
+*.jks
+*.keystore
+
+# 빌드 산출물
+*.apk
+*.aab
