@@ -45,8 +45,8 @@ public class CursorService extends AccessibilityService {
     private static final long FADE_DURATION = 400;   // 사라지는 속도(ms)
     private static final long POLL_INTERVAL = 1000;  // 주기 확인 간격(ms)
 
-    private static final float DRAG_THRESHOLD = 15f;
-    private static final long MAX_DURATION = 10000;
+    private static final float DRAG_THRESHOLD = 15f;  // 이만큼 움직이기 전까지는 탭으로 취급(px)
+    private static final long SEGMENT_DURATION = 10;  // 터치 조각 하나의 길이(ms)
 
     private WindowManager windowManager;
     private ImageView cursorView;
@@ -61,7 +61,15 @@ public class CursorService extends AccessibilityService {
 
     private boolean pressing = false;
     private float downX, downY;
-    private long downTime;
+
+    // 터치 재현 상태
+    private GestureDescription.StrokeDescription stroke; // 화면에 닿아 있는 터치 (없으면 null)
+    private boolean dispatching = false;      // 보낸 조각이 아직 끝나지 않음
+    private boolean pressRequested = false;   // 새 터치를 시작해야 함
+    private boolean releaseRequested = false; // 터치를 끝내야 함
+    private boolean dragging = false;         // 누른 뒤 DRAG_THRESHOLD 넘게 움직임
+    private float strokeX, strokeY;           // 마지막으로 보낸 조각의 끝점
+    private float targetX, targetY;           // 터치가 따라가야 할 위치
 
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -163,7 +171,7 @@ public class CursorService extends AccessibilityService {
     private void setActive(boolean on) {
         if (active == on) return;
         active = on;
-        setPressed(false);
+        releaseTouch();
 
         AccessibilityServiceInfo info = getServiceInfo();
         info.setMotionEventSources(on ? InputDevice.SOURCE_MOUSE : 0);
@@ -192,25 +200,54 @@ public class CursorService extends AccessibilityService {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 setPressed(true);
-                downX = x;
-                downY = y;
-                downTime = event.getEventTime();
+                downX = targetX = toScreen(x);
+                downY = targetY = toScreen(y);
+                dragging = false;
+                pressRequested = true;
+                break;
+
+            case MotionEvent.ACTION_MOVE:
+                if (pressing) follow(x, y);
                 break;
 
             case MotionEvent.ACTION_UP:
                 if (pressing) {
-                    setPressed(false);
-                    long duration = event.getEventTime() - downTime;
-                    duration = Math.max(50, Math.min(duration, MAX_DURATION));
-                    performTouch(downX, downY, x, y, duration);
+                    follow(x, y);
+                    releaseTouch();
                 }
                 break;
 
             case MotionEvent.ACTION_CANCEL:
-                setPressed(false);
+                releaseTouch();
                 break;
         }
+        pumpTouch();
         updateStatus();
+    }
+
+    // 음수 좌표는 제스처 생성에서 예외가 나므로 화면 안으로 보정.
+    // 이어 붙이는 조각은 앞 조각의 끝점과 정확히 같아야 해서 정수로 맞춤
+    private static float toScreen(float v) {
+        return Math.max(0f, Math.round(v));
+    }
+
+    // 누른 채 움직일 때 터치가 따라갈 위치를 갱신
+    private void follow(float x, float y) {
+        if (!dragging && Math.hypot(x - downX, y - downY) > DRAG_THRESHOLD) {
+            dragging = true;
+        }
+        if (dragging) {
+            targetX = toScreen(x);
+            targetY = toScreen(y);
+        }
+    }
+
+    // 누르고 있던 터치를 뗌
+    private void releaseTouch() {
+        if (!pressing) return;
+        setPressed(false);
+        releaseRequested = true;
+        pumpTouch();
     }
 
     // 커서를 보이게 하고 자동 숨김 타이머를 다시 시작
@@ -231,32 +268,77 @@ public class CursorService extends AccessibilityService {
         cursorView.setScaleY(scale);
     }
 
-    // 누른 위치부터 뗀 위치까지, 누른 시간만큼 터치를 재현
-    private void performTouch(float x1, float y1, float x2, float y2, long duration) {
-        // 음수 좌표는 제스처 생성에서 예외가 나므로 화면 안으로 보정
-        x1 = Math.max(0f, x1);
-        y1 = Math.max(0f, y1);
-        x2 = Math.max(0f, x2);
-        y2 = Math.max(0f, y2);
+    // 터치를 짧은 조각으로 나눠 실시간으로 재현.
+    // 새 제스처를 보내면 진행 중인 제스처가 취소되므로, 앞 조각이 끝난 뒤에 다음 조각을 이어 붙임
+    private void pumpTouch() {
+        if (dispatching) return;
 
         Path path = new Path();
-        path.moveTo(x1, y1);
-        boolean isDrag = Math.hypot(x2 - x1, y2 - y1) > DRAG_THRESHOLD;
-        if (isDrag) {
-            path.lineTo(x2, y2);
-        }
-
-        String kind = isDrag ? "드래그 " : "탭 ";
+        GestureDescription.StrokeDescription next;
+        boolean ends = false;
+        String kind;
         try {
+            if (stroke == null) {
+                // 누름: 손가락을 댄 채로 끝나는 조각
+                if (!pressRequested) return;
+                pressRequested = false;
+                strokeX = downX;
+                strokeY = downY;
+                path.moveTo(strokeX, strokeY);
+                next = new GestureDescription.StrokeDescription(path, 0, SEGMENT_DURATION, true);
+                kind = "누름";
+            } else {
+                // 이동 또는 뗌: 앞 조각의 끝점에서 이어감
+                ends = releaseRequested;
+                boolean moved = targetX != strokeX || targetY != strokeY;
+                if (!ends && !moved) return;
+                releaseRequested = false;
+                path.moveTo(strokeX, strokeY);
+                if (moved) path.lineTo(targetX, targetY);
+                next = stroke.continueStroke(path, 0, SEGMENT_DURATION, !ends);
+                strokeX = targetX;
+                strokeY = targetY;
+                kind = ends ? "뗌" : "이동";
+            }
+
             GestureDescription gesture = new GestureDescription.Builder()
-                    .addStroke(new GestureDescription.StrokeDescription(path, 0, duration))
+                    .addStroke(next)
                     .build();
-            boolean sent = dispatchGesture(gesture, null, null);
-            lastAction = kind + duration + "ms" + (sent ? "" : " (전송 실패)");
+            final boolean endsTouch = ends;
+            boolean sent = dispatchGesture(gesture, new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    dispatching = false;
+                    if (endsTouch) stroke = null;
+                    pumpTouch();
+                }
+
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    abortTouch("취소됨");
+                    pumpTouch();
+                }
+            }, null);
+            if (sent) {
+                stroke = next;
+                dispatching = true;
+                lastAction = kind;
+            } else {
+                abortTouch(kind + " 전송 실패");
+            }
         } catch (RuntimeException e) {
             // 터치 하나를 놓치더라도 서비스가 죽지 않게 함
-            lastAction = kind + "실패: " + e.getMessage();
+            abortTouch("실패: " + e.getMessage());
         }
+    }
+
+    // 진행 중이던 터치를 버림 (시스템이 이미 터치를 취소한 상태)
+    private void abortTouch(String reason) {
+        dispatching = false;
+        stroke = null;
+        releaseRequested = false;
+        lastAction = reason;
+        updateStatus();
     }
 
     private void updateStatus() {

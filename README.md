@@ -13,7 +13,7 @@
 1. **대상 앱 감지**: 창 변경 이벤트(`TYPE_WINDOW_STATE_CHANGED`, `TYPE_WINDOWS_CHANGED`)와 1초 주기 확인으로 활성 창의 패키지명을 읽는다. systemui와 삼성 키보드는 무시한다.
 2. **마우스 입력 가져오기**: 대상 앱이 앞에 있으면 `setMotionEventSources(SOURCE_MOUSE)`로 마우스 이벤트를 서비스가 받는다. 다른 앱에서는 `0`으로 되돌려 시스템 기본 동작을 쓴다.
 3. **커서 표시**: 마우스 좌표에 링 모양 오버레이(`TYPE_ACCESSIBILITY_OVERLAY`)를 그린다. 링 중심이 터치 지점이다. 누르는 동안 안쪽이 채워지고 0.8배로 줄어든다. 3초간 입력이 없으면 사라진다.
-4. **터치 재현**: 버튼을 뗄 때 누른 위치부터 뗀 위치까지, 누른 시간만큼 `dispatchGesture`로 터치를 보낸다. 이동 거리가 15px 이하면 탭, 넘으면 직선 드래그다.
+4. **터치 재현**: 버튼을 누르는 순간 `dispatchGesture`로 터치를 시작하고, 누른 채 움직이면 10ms짜리 조각을 `continueStroke`로 이어 붙여 마우스를 따라간다. 버튼을 떼면 터치도 끝난다. 누른 위치에서 15px 넘게 움직이기 전까지는 터치를 제자리에 둔다(탭).
 
 ## 빌드 환경
 
@@ -63,6 +63,8 @@ private static final Set<String> TARGET_PACKAGES = new HashSet<>(Arrays.asList(
 | `PRESSED_SCALE` | 0.8 | 누를 때 크기 비율 |
 | `HIDE_DELAY` | 3000 | 자동 숨김까지 시간(ms) |
 | `POLL_INTERVAL` | 1000 | 주기 확인 간격(ms) |
+| `DRAG_THRESHOLD` | 15 | 드래그로 넘어가는 이동 거리(px) |
+| `SEGMENT_DURATION` | 10 | 터치 조각 하나의 길이(ms) |
 
 ## 권한
 
@@ -76,9 +78,8 @@ private static final Set<String> TARGET_PACKAGES = new HashSet<>(Arrays.asList(
 
 ## 한계
 
-- **입력 지연**: 터치가 버튼을 뗄 때 실행된다. 길게 누르기와 드래그가 실시간이 아니다.
-- **드래그 경로**: 시작점과 끝점을 잇는 직선으로만 재현한다.
-- **제스처 끊김**: 새 제스처가 들어오면 진행 중인 제스처가 취소된다.
+- **입력 지연**: 터치 조각은 앞 조각이 끝난 뒤에 보낸다. 드래그가 마우스보다 조각 하나만큼 늦게 따라온다.
+- **제스처 끊김**: 시스템이 진행 중인 터치를 취소하면 버튼을 누르고 있어도 터치가 끊긴다. 다시 눌러야 한다.
 - **휠, 우클릭**: 대상 게임 안에서는 처리하지 않는다.
 - **하드코딩**: 대상 앱과 무시할 앱 목록이 코드에 있다.
 - `setObservedMotionEventSources()`(가로채지 않고 관찰만 하는 방식)는 확인한 기기에 메서드가 없어 쓰지 못했다.
